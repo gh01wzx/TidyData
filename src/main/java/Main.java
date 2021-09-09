@@ -4,7 +4,10 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import javax.swing.*;
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -46,37 +49,8 @@ public class Main {
          * }
          * */
         String wholeFile = eliminateUnnecessaryData(files);
-        //String wholeFile = concatenateFiles(files);
-        //PrintWriter pw = new PrintWriter("output.json");
-        //System.out.println(wholeFile);
+        JSONObject tidyJSON = constructJSON(wholeFile);
 
-        // jason parser
-//        JSONParser jsonParser = new JSONParser();
-//        JSONObject tidyJSON = new JSONObject();
-//
-//        try (FileReader reader = new FileReader("tidyCustomer1.json")) {
-//
-//            //Read customers JSON file
-//            JSONObject customers = (JSONObject) jsonParser.parse(reader);
-//
-//            String lastName = (String) customers.get("lastName");
-//            String firstName = (String) customers.get("firstName");
-//
-//            JSONObject userAddress = (JSONObject) customers.get("userAddress");
-//            String address = (String) userAddress.get("text");
-//
-//            JSONArray transactions = (JSONArray) customers.get("transactions");
-//
-//            tidyJSON = constructJSON(transactions, lastName, firstName, findDistrict(address));
-//
-//        } catch (FileNotFoundException e) {
-//            e.printStackTrace();
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        } catch (ParseException e) {
-//            e.printStackTrace();
-//        }
-//
 //        try (FileWriter fw = new FileWriter("TidyJSON.json")) {
 //            fw.write(tidyJSON.toJSONString());
 //            fw.flush();
@@ -90,7 +64,7 @@ public class Main {
     /**
      * open a JFile chooser to load the files
      *
-     * @return File[]
+     * @return files
      */
     private static File[] loadTheFiles() {
         JFrame frame = new JFrame();
@@ -112,7 +86,7 @@ public class Main {
     /**
      * eliminate unnecessary data and concatenate files
      *
-     * @return String
+     * @return wholeFile
      */
     private static String eliminateUnnecessaryData(File[] files) {
         //for concatenated all customers
@@ -195,46 +169,81 @@ public class Main {
     }
 
 
-    private static JSONObject constructJSON(JSONArray transactions, String lastName, String firstName, String address) {
+    /**
+     * this method take in a whole file,and then reconstruct transactions structure, the transactions after the
+     * reconstruction only have transaction in the desired category list with {amount,category,thirdParty} as property
+     *
+     * @return wholeJSON
+     */
+    private static JSONObject constructJSON(String file) {
+        JSONParser jp = new JSONParser();
+        //for contain reconstructed transactions
         JSONArray transactionList = new JSONArray();
+        String wholeFile = "{ \"customers\":[";
+        try {
+            JSONObject jsObject = (JSONObject) jp.parse(file);
+            JSONArray customers = (JSONArray) jsObject.get("customers");
+            JSONObject tidyObject = new JSONObject();
 
-        for (int i = 0; i < transactions.size(); i++) {
-            //get current transaction
-            JSONObject currentTrans = (JSONObject) transactions.get(i);
-            //get current transaction tags
-            JSONArray tags = (JSONArray) currentTrans.get("tags");
-            //check if the category of this transaction is in the desired category list
-            HashMap result = checkInCategory(tags);
+            for (int i = 0; i < customers.size(); i++) {
+                JSONObject currentCustomer = (JSONObject) customers.get(i);
+                JSONArray transactions = (JSONArray) currentCustomer.get("transactions");
 
-            if (result.get("category") != null && result.get("thirdParty") != null) {
-                //get transaction amount
-                String amount = currentTrans.get("amount").toString();
+                for (int j = 0; j < transactions.size(); j++) {
+                    JSONObject currentTransaction = (JSONObject) transactions.get(j);
+                    JSONArray tags = (JSONArray) currentTransaction.get("tags");
 
-                JSONObject transaction = new JSONObject();
-                transaction.put("category", result.get("category"));
-                transaction.put("thirdParty", result.get("thirdParty"));
-                transaction.put("amount", amount);
+                    HashMap result = checkInCategory(tags);
 
-                transactionList.add(transaction);
+                    if (result.get("category") != null && result.get("thirdParty") != null) {
+                        JSONObject tidyTransaction = new JSONObject();
+                        //get transaction amount
+                        String amount = currentTransaction.get("amount").toString();
+                        tidyTransaction.put("category", result.get("category"));
+                        tidyTransaction.put("thirdParty", result.get("thirdParty"));
+                        tidyTransaction.put("amount", amount);
+
+                        //add to tidy transaction
+                        transactionList.add(tidyTransaction);
+                    }
+                }
+                tidyObject.put("firstName", currentCustomer.get("firstName"));
+                tidyObject.put("lastName", currentCustomer.get("lastName"));
+                tidyObject.put("district", findDistrict(currentCustomer.get("address").toString()));
+                tidyObject.put("transactions", transactionList);
+                wholeFile += tidyObject.toString();
+
+                if (customers.size() > 1 && i != customers.size() - 1) {
+                    wholeFile += ",";
+                }
+
             }
-
+        } catch (ParseException e) {
+            System.out.println(e);
         }
-        JSONObject tidyObject = new JSONObject();
-        tidyObject.put("transactions", transactionList);
-        tidyObject.put("firstName", firstName);
-        tidyObject.put("lastName", lastName);
-        tidyObject.put("district", address);
+        //closure
+        wholeFile += "] }";
 
+        JSONObject tidyJson = null;
+        try {
+            tidyJson = (JSONObject) jp.parse(wholeFile);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        System.out.println(wholeFile);
 
-        return tidyObject;
+        return tidyJson;
     }
 
     private static String findDistrict(String address) {
         String district = "";
 
-        for (int i = address.length() - 6; address.charAt(i) != ' '; i--) {
-            district += address.charAt(i);
+        if (address.length() > 6) {
+            for (int i = address.length() - 6; address.charAt(i) != ' '; i--) {
+                district += address.charAt(i);
+            }
         }
+
 
         return new StringBuffer(district).reverse().toString();
     }
