@@ -39,10 +39,10 @@ public class Main {
          *                               "xxx": "xxx"
          *                          }
          *                          ]
-         *                 ]
          *           },
          *           {...},
          *           {...}
+         *           ]
          * }
          * */
         String wholeFile = eliminateUnnecessaryData(files);
@@ -88,92 +88,10 @@ public class Main {
     }
 
     /**
-     * eliminate unnecessary data and concatenate files
-     * @return String
-     * */
-    private static String eliminateUnnecessaryData(File[] files) {
-        //for concatenated all customers
-        String customers = "{ \"customers\": [";
-
-        for (int i = 0; i < files.length; i++) {
-            JSONParser jsonParser = new JSONParser();
-            try (FileReader reader = new FileReader(files[i])) {
-
-                //Read customers JSON file
-                JSONObject file = (JSONObject) jsonParser.parse(reader);
-
-                JSONObject statement = (JSONObject) file.get("statement");
-                JSONObject bankData = (JSONObject) statement.get("bankData");
-
-
-                JSONArray bankAccount = (JSONArray) bankData.get("bankAccounts");
-                String toObject = "{ \"transactions\" : [ ";
-                for (int j = 0; j < bankAccount.size(); j++) {
-                    JSONObject current = (JSONObject) bankAccount.get(i);
-                    String temp = current.get("transactions").toString();
-                    temp = temp.substring(1, temp.length() - 1);
-                    if (bankAccount.size() > 1) {
-                        temp = temp + ",";
-                    }
-                    toObject += temp;
-                }
-                toObject = toObject.substring(0, toObject.length() - 1);
-                toObject += "] }";
-                JSONParser jp = new JSONParser();
-                JSONObject customer = (JSONObject) jp.parse(toObject);
-                String lastName = (String) file.get("lastName");
-                String firstName = (String) file.get("firstName");
-                JSONObject userAddress = (JSONObject) bankData.get("userAddress");
-                String address = (String) userAddress.get("text");
-                customer.put("lastName", lastName);
-                customer.put("firstName", firstName);
-                customer.put("address", address);
-
-                customers += customer.toString();
-
-                if (files.length > 1 && i != files.length - 1) {
-                    customers += ",";
-                }
-
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (ParseException e) {
-                e.printStackTrace();
-            }
-        }
-        customers += "] }";
-
-        return customers;
-    }
-
-    private static String concatenateFiles(File[] files) {
-        String wholeFile = "{\"customers\":[";
-        for (int i = 0; i < files.length; i++) {
-            try {
-                BufferedReader br = new BufferedReader(new FileReader(files[i]));
-                String line = br.readLine();
-                while (line != null) {
-                    wholeFile += line;
-                    line = br.readLine();
-                }
-
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            // if only one file are selected, then it won't add comma
-            if (files.length > 1) {
-                wholeFile += ",";
-            }
-        }
-        wholeFile = wholeFile + "]}";
-
-        return wholeFile;
-    }
-
+     * open a JFile chooser to load the files
+     *
+     * @return File[]
+     */
     private static File[] loadTheFiles() {
         JFrame frame = new JFrame();
 
@@ -190,6 +108,92 @@ public class Main {
 
         return files;
     }
+
+    /**
+     * eliminate unnecessary data and concatenate files
+     *
+     * @return String
+     */
+    private static String eliminateUnnecessaryData(File[] files) {
+        //for concatenated all customers
+        String customers = "{ \"customers\": [";
+
+        //for each file(customer)
+        for (int i = 0; i < files.length; i++) {
+            JSONParser jsonParser = new JSONParser();
+
+            //read current file
+            try (FileReader reader = new FileReader(files[i])) {
+
+                //parse customers JSON file
+                JSONObject file = (JSONObject) jsonParser.parse(reader);
+                //access the nested json object to extract necessary data
+                JSONObject statement = (JSONObject) file.get("statement");
+                JSONObject bankData = (JSONObject) statement.get("bankData");
+
+                // a customer have many accounts,each account have many transactions
+                JSONArray bankAccount = (JSONArray) bankData.get("bankAccounts");
+                //for concatenated transactions
+                String toObject = "{ \"transactions\" : [ ";
+                // for each bank account
+                for (int j = 0; j < bankAccount.size(); j++) {
+                    JSONObject current = (JSONObject) bankAccount.get(i);
+                    String temp = current.get("transactions").toString();
+
+                    /**
+                     * because transactions are json object list, like "transactions":[...]
+                     * to concatenate the transactions without format error, we need to delete "[" and "]"
+                     * */
+                    temp = temp.substring(1, temp.length() - 1);
+
+                    // if customer have account number greater than 1, then add "," in between 2 transactions
+                    if (bankAccount.size() > 1) {
+                        temp = temp + ",";
+                    }
+
+                    toObject += temp;
+                }
+                //get rid of last "," , because now it is the end of the transaction, no more transactions to add
+                toObject = toObject.substring(0, toObject.length() - 1);
+                //add close symbol
+                toObject += "] }";
+
+                JSONParser jp = new JSONParser();
+                //make concatenated file to a json object
+                JSONObject customer = (JSONObject) jp.parse(toObject);
+
+                //add other customer data such as last name...
+                String lastName = (String) file.get("lastName");
+                String firstName = (String) file.get("firstName");
+                //get user address, because address are nested object, access it require access the outer object
+                JSONObject userAddress = (JSONObject) bankData.get("userAddress");
+                String address = (String) userAddress.get("text");
+
+                customer.put("lastName", lastName);
+                customer.put("firstName", firstName);
+                customer.put("address", address);
+
+                customers += customer.toString();
+
+                //add "," only if more than 1 customer files are selected, and don't add "," at the end of file
+                if (files.length > 1 && i != files.length - 1) {
+                    customers += ",";
+                }
+
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+        }
+        //closure
+        customers += "] }";
+
+        return customers;
+    }
+
 
     private static JSONObject constructJSON(JSONArray transactions, String lastName, String firstName, String address) {
         JSONArray transactionList = new JSONArray();
