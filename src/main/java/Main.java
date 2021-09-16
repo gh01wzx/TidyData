@@ -231,7 +231,6 @@ public class Main {
         } catch (ParseException e) {
             e.printStackTrace();
         }
-        System.out.println(wholeFile);
 
         return tidyJson;
     }
