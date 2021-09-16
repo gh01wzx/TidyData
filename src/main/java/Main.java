@@ -4,61 +4,21 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import javax.swing.*;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
 public class Main {
-    public static void main(String[] args) throws IOException {
-
+    public static void main(String[] args) {
         //open a JFileChooser, load multiple json files
         File[] files = loadTheFiles();
-        /**
-         * this method take in a file list(JSON file we loaded before),then extract only necessary data from original
-         * file, then concatenate them and parse it into a JSON Object
-         *
-         * Data structure after the concatenation will be
-         * {
-         *      "customers":[
-         *           {
-         *                "lastName":"xxx",
-         *                "firstName": "xxx",
-         *                "address": "xxx"
-         *                "transactions":[
-         *                     "date": "xxx",
-         *                     "amount": xxx,
-         *                     "balance": "xxx",
-         *                     "text": "xxx",
-         *                     "type": "xxx",
-         *                     "tags": [
-         *                          {
-         *                               "xxx": "xxx"
-         *                          },
-         *                          {
-         *                               "xxx": "xxx"
-         *                          }
-         *                          ]
-         *           },
-         *           {...},
-         *           {...}
-         *           ]
-         * }
-         * */
+        //eliminate unnecessary data and concatenate files
         String wholeFile = eliminateUnnecessaryData(files);
+        //neat object
         JSONObject tidyJSON = constructJSON(wholeFile);
-
-//        try (FileWriter fw = new FileWriter("TidyJSON.json")) {
-//            fw.write(tidyJSON.toJSONString());
-//            fw.flush();
-//
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-
+        //write to local
+        writeLocalFile(tidyJSON);
     }
 
     /**
@@ -67,8 +27,8 @@ public class Main {
      * @return files
      */
     private static File[] loadTheFiles() {
+        //add a frame contain the file chooser
         JFrame frame = new JFrame();
-
         JFileChooser fileChooser = new JFileChooser();
 
         fileChooser.setMultiSelectionEnabled(true);
@@ -83,8 +43,37 @@ public class Main {
         return files;
     }
 
+
     /**
-     * eliminate unnecessary data and concatenate files
+     * this method take in a file list(JSON file we loaded before),then extract only necessary data from original
+     * file, then concatenate them and parse it into a JSON Object
+     * <p>
+     * Data structure after the concatenation will be
+     * {
+     * "customers":[
+     * {
+     * "lastName":"xxx",
+     * "firstName": "xxx",
+     * "address": "xxx"
+     * "transactions":[
+     * "date": "xxx",
+     * "amount": xxx,
+     * "balance": "xxx",
+     * "text": "xxx",
+     * "type": "xxx",
+     * "tags": [
+     * {
+     * "xxx": "xxx"
+     * },
+     * {
+     * "xxx": "xxx"
+     * }
+     * ]
+     * },
+     * {...},
+     * {...}
+     * ]
+     * }
      *
      * @return wholeFile
      */
@@ -104,33 +93,10 @@ public class Main {
                 //access the nested json object to extract necessary data
                 JSONObject statement = (JSONObject) file.get("statement");
                 JSONObject bankData = (JSONObject) statement.get("bankData");
-
                 // a customer have many accounts,each account have many transactions
                 JSONArray bankAccount = (JSONArray) bankData.get("bankAccounts");
-                //for concatenated transactions
-                String toObject = "{ \"transactions\" : [ ";
-                // for each bank account
-                for (int j = 0; j < bankAccount.size(); j++) {
-                    JSONObject current = (JSONObject) bankAccount.get(i);
-                    String temp = current.get("transactions").toString();
 
-                    /**
-                     * because transactions are json object list, like "transactions":[...]
-                     * to concatenate the transactions without format error, we need to delete "[" and "]"
-                     * */
-                    temp = temp.substring(1, temp.length() - 1);
-
-                    // if customer have account number greater than 1, then add "," in between 2 transactions
-                    if (bankAccount.size() > 1) {
-                        temp = temp + ",";
-                    }
-
-                    toObject += temp;
-                }
-                //get rid of last "," , because now it is the end of the transaction, no more transactions to add
-                toObject = toObject.substring(0, toObject.length() - 1);
-                //add close symbol
-                toObject += "] }";
+                String toObject = concatenateTransactions(bankAccount);
 
                 JSONParser jp = new JSONParser();
                 //make concatenated file to a json object
@@ -166,6 +132,41 @@ public class Main {
         customers += "] }";
 
         return customers;
+    }
+
+    /**
+     * this method is used to concatenate all transactions from different bank account of a person
+     *
+     * @return toObject
+     */
+    private static String concatenateTransactions(JSONArray bankAccount) {
+        //for concatenated transactions
+        String toObject = "{ \"transactions\" : [ ";
+        // for each bank account
+        for (int j = 0; j < bankAccount.size(); j++) {
+            // was i now j
+            JSONObject current = (JSONObject) bankAccount.get(j);
+            String temp = current.get("transactions").toString();
+
+            /**
+             * because transactions are json object list, like "transactions":[...]
+             * to concatenate the transactions without format error, we need to delete "[" and "]"
+             * */
+            temp = temp.substring(1, temp.length() - 1);
+
+            // if customer have account number greater than 1, then add "," in between 2 transactions
+            if (bankAccount.size() > 1) {
+                temp = temp + ",";
+            }
+
+            toObject += temp;
+        }
+        //get rid of last "," , because now it is the end of the transaction, no more transactions to add
+        toObject = toObject.substring(0, toObject.length() - 1);
+        //add close symbol
+        toObject += "] }";
+
+        return toObject;
     }
 
 
@@ -235,6 +236,7 @@ public class Main {
         return tidyJson;
     }
 
+    //find district from a customer address
     private static String findDistrict(String address) {
         String district = "";
 
@@ -244,10 +246,14 @@ public class Main {
             }
         }
 
-
         return new StringBuffer(district).reverse().toString();
     }
 
+    /**
+     * check whether the transaction is what we wanted (in category list)
+     *
+     * @return tagList
+     */
     private static HashMap<String, String> checkInCategory(JSONArray tags) {
         int result = 0;
 
@@ -255,7 +261,6 @@ public class Main {
         List<String> category = Arrays.asList("Loans", "SACC Loans", "Non SACC Loans", "Insurance", "Groceries",
                 "Gambling", "Subscription TV", "Telecommunications", "Utilities");
 
-        //List<String> tagList = new ArrayList<String>();
         HashMap<String, String> tagList = new HashMap<String, String>();
 
         for (int i = 0; i < tags.size(); i++) {
@@ -272,4 +277,16 @@ public class Main {
         return tagList;
     }
 
+    /**
+     * write the concatenated and neat
+     */
+    private static void writeLocalFile(JSONObject tidyJSON) {
+        try (FileWriter fw = new FileWriter("TidyJSON.json")) {
+            fw.write(tidyJSON.toJSONString());
+            fw.flush();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
