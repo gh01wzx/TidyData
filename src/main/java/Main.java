@@ -154,6 +154,8 @@ public class Main {
              * */
             temp = temp.substring(1, temp.length() - 1);
 
+
+
             // if customer have account number greater than 1, then add "," in between 2 transactions
             if (bankAccount.size() > 1) {
                 temp = temp + ",";
@@ -161,10 +163,14 @@ public class Main {
 
             toObject += temp;
         }
-        //get rid of last "," , because now it is the end of the transaction, no more transactions to add
-        toObject = toObject.substring(0, toObject.length() - 1);
+        if (bankAccount.size() >1)
+        {
+            //get rid of last "," , because now it is the end of the transaction, no more transactions to add
+            toObject = toObject.substring(0, toObject.length() - 1);
+        }
         //add close symbol
         toObject += "] }";
+
 
         return toObject;
     }
