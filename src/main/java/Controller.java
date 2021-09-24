@@ -21,18 +21,83 @@ public class Controller {
         fileType.frame.setVisible(true);
     }
 
-    private static JSONObject summarisedTransactions(JSONObject tidyJSON) {
+    private static JSONObject summariseTransactions(JSONObject tidyJSON) {
         JSONArray customers = (JSONArray) tidyJSON.get("customers");
 
+        for (int i = 0; i < customers.size(); i++) {
+            JSONObject currentCustomer = (JSONObject) customers.get(i);
+            JSONArray transactions = (JSONArray) currentCustomer.get("transactions");
+
+            JSONObject clustered = clusterTransactions(transactions);
+            summariseCluster(clustered);
+        }
 
         return tidyJSON;
-
     }
 
-    private static int fileTypeSelection() {
-
-        return 0;
+    private static void summariseCluster(JSONObject clustered) {
+        System.out.println(clustered);
     }
+
+    private static JSONObject clusterTransactions(JSONArray transactions) {
+        JSONObject clustered = new JSONObject();
+
+        JSONArray loans = new JSONArray();
+        JSONArray sacc = new JSONArray();
+        JSONArray non_SACC = new JSONArray();
+        JSONArray insurance = new JSONArray();
+        JSONArray groceries = new JSONArray();
+        JSONArray gambling = new JSONArray();
+        JSONArray subscription = new JSONArray();
+        JSONArray telecommunications = new JSONArray();
+        JSONArray utilities = new JSONArray();
+
+        for (int i = 0; i < transactions.size(); i++) {
+            JSONObject currentTransaction = (JSONObject) transactions.get(i);
+
+            switch (currentTransaction.get("category").toString()) {
+                case "Loans":
+                    loans.add(currentTransaction);
+                    break;
+                case "SACC Loans":
+                    sacc.add(currentTransaction);
+                    break;
+                case "Non SACC Loans":
+                    non_SACC.add(currentTransaction);
+                    break;
+                case "Insurance":
+                    insurance.add(currentTransaction);
+                    break;
+                case "Groceries":
+                    groceries.add(currentTransaction);
+                    break;
+                case "Gambling":
+                    gambling.add(currentTransaction);
+                    break;
+                case "Subscription TV":
+                    subscription.add(currentTransaction);
+                    break;
+                case "Telecommunications":
+                    telecommunications.add(currentTransaction);
+                    break;
+                case "Utilities":
+                    utilities.add(currentTransaction);
+                    break;
+            }
+        }
+        clustered.put("loans", loans);
+        clustered.put("sacc", sacc);
+        clustered.put("non_sacc", non_SACC);
+        clustered.put("insurance", insurance);
+        clustered.put("groceries", groceries);
+        clustered.put("gambling", gambling);
+        clustered.put("subscription", subscription);
+        clustered.put("telecommunications", telecommunications);
+        clustered.put("utilities", utilities);
+
+        return clustered;
+    }
+
 
     /**
      * this method take in a file list(JSON file we loaded before),then extract only necessary data from original
@@ -227,7 +292,8 @@ public class Controller {
             e.printStackTrace();
         }
 
-        writeLocalFile(tidyJson);
+        //writeLocalFile(tidyJson);
+        summariseTransactions(tidyJson);
 
         return tidyJson;
     }
