@@ -7,7 +7,8 @@ import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.*;
-import java.util.HashMap;
+import java.text.DecimalFormat;
+import java.util.*;
 
 public class Controller {
     public static Model model;
@@ -23,20 +24,223 @@ public class Controller {
 
     private static JSONObject summariseTransactions(JSONObject tidyJSON) {
         JSONArray customers = (JSONArray) tidyJSON.get("customers");
+        JSONObject summarisedCustomers = new JSONObject();
+        JSONArray customersArray = new JSONArray();
 
         for (int i = 0; i < customers.size(); i++) {
             JSONObject currentCustomer = (JSONObject) customers.get(i);
             JSONArray transactions = (JSONArray) currentCustomer.get("transactions");
 
             JSONObject clustered = clusterTransactions(transactions);
-            summariseCluster(clustered);
+            JSONObject customer = summariseCluster(clustered);
+            customer.put("lastName", currentCustomer.get("lastName"));
+            customer.put("firstName", currentCustomer.get("firstName"));
+            customer.put("district", currentCustomer.get("district"));
+
+            customersArray.add(customer);
         }
+
+        summarisedCustomers.put("customers", customersArray);
+
+        writeLocalFile(summarisedCustomers);
 
         return tidyJSON;
     }
 
-    private static void summariseCluster(JSONObject clustered) {
-        System.out.println(clustered);
+    private static JSONObject summariseCluster(JSONObject clustered) {
+        //to remove empty object
+        clustered = removeEmpty(clustered);
+        //calculate total spending
+        JSONObject customerTemp = totalSpending(clustered);
+        JSONObject transactions = (JSONObject) customerTemp.get("transactions");
+        Set<String> categories = transactions.keySet();
+        JSONObject customer = new JSONObject();
+
+        for (String category : categories) {
+            JSONObject currentCate = summariseCategory((JSONArray) transactions.get(category));
+
+            customer.put(category, currentCate);
+        }
+
+        customer.put("averageMonthlySpent", customerTemp.get("averageMonthlySpent").toString());
+        customer.put("totalSpent", customerTemp.get("totalSpent").toString());
+
+        return customer;
+    }
+
+    private static JSONObject summariseCategory(JSONArray currentCategoryTransactions) {
+        float totalSpending = 0;
+        float monthlySpending = 0;
+        int count = currentCategoryTransactions.size();
+        //get unique third party
+        HashSet<String> thirdParties = new HashSet<>();
+        DecimalFormat df = new DecimalFormat("#.##");
+
+        for (int i = 0; i < currentCategoryTransactions.size(); i++) {
+            JSONObject transaction = (JSONObject) currentCategoryTransactions.get(i);
+
+            totalSpending += Float.parseFloat(transaction.get("amount").toString());
+            thirdParties.add(transaction.get("thirdParty").toString());
+        }
+
+        totalSpending = Math.abs(totalSpending);
+        monthlySpending = totalSpending / 12;
+
+        List<String> thirdPty = new ArrayList<>(thirdParties);
+        JSONObject summarised = new JSONObject();
+
+        // if current category transaction have more than 1 third-parties
+        if (thirdParties.size() > 1) {
+            JSONObject clusteredThirdPTY = new JSONObject();
+
+            for (int i = 0; i < thirdPty.size(); i++) {
+                JSONArray temp = new JSONArray();
+
+                for (int j = 0; j < currentCategoryTransactions.size(); j++) {
+                    JSONObject currentTransaction = (JSONObject) currentCategoryTransactions.get(j);
+
+                    String currentThirdPty = currentTransaction.get("thirdParty").toString();
+
+                    if (currentThirdPty.compareTo(thirdPty.get(i)) == 0) {
+                        temp.add(currentTransaction);
+                    }
+                }
+                clusteredThirdPTY.put(thirdPty.get(i), temp);
+            }
+            JSONArray thirdPartyArray = new JSONArray();
+
+            //summarise different third party
+            for (int i = 0; i < thirdPty.size(); i++) {
+                JSONArray currentTPTY = (JSONArray) clusteredThirdPTY.get(thirdPty.get(i));
+
+                float totalCurrent = 0;
+                float monthlyCurrent = 0;
+                int currentCount = currentTPTY.size();
+
+
+                for (int j = 0; j < currentTPTY.size(); j++) {
+                    JSONObject currentTrans = (JSONObject) currentTPTY.get(j);
+
+                    totalCurrent += Float.parseFloat(currentTrans.get("amount").toString());
+                }
+
+                totalCurrent = Math.abs(totalCurrent);
+                monthlyCurrent = totalCurrent / 12;
+
+                float spendPercentCurr = totalCurrent / totalSpending;
+                float frequencyPercentageCurr = (float) currentCount / (float) count;
+
+                JSONObject summarisedTPTY = new JSONObject();
+
+
+                summarisedTPTY.put("thirdParty", thirdPty.get(i));
+                summarisedTPTY.put("monthlySpending", df.format(monthlyCurrent));
+                summarisedTPTY.put("totalSpending", df.format(totalCurrent));
+                summarisedTPTY.put("count", currentCount);
+                summarisedTPTY.put("spendingPercentage", df.format(spendPercentCurr));
+                summarisedTPTY.put("frequencyPercentage", df.format(frequencyPercentageCurr));
+
+
+                thirdPartyArray.add(summarisedTPTY);
+
+                //summarised.put(thirdPty.get(i),summarisedTPTY);
+            }
+            String mostFreq = findTheMost(thirdPartyArray, "frequencyPercentage");
+            String mostSpend = findTheMost(thirdPartyArray, "spendingPercentage");
+
+            summarised.put("total", df.format(totalSpending));
+            summarised.put("average", df.format(monthlySpending));
+            summarised.put("count", count);
+            summarised.put("primary", mostSpend);
+            summarised.put("mostFrenquentlyVisit", mostFreq);
+            summarised.put("mostSpending", mostSpend);
+            summarised.put("thirdParty", thirdPartyArray);
+        } else {
+            summarised.put("total", df.format(totalSpending));
+            summarised.put("average", df.format(monthlySpending));
+            summarised.put("count", count);
+            summarised.put("primary", thirdPty.get(0));
+            summarised.put("mostFrenquentlyVisit", thirdPty.get(0));
+            summarised.put("mostSpending", thirdPty.get(0));
+
+            JSONObject currentTPTY = new JSONObject();
+
+            currentTPTY.put("thirdParty", thirdPty.get(0));
+            currentTPTY.put("monthlySpending", df.format(monthlySpending));
+            currentTPTY.put("totalSpending", df.format(totalSpending));
+            currentTPTY.put("count", count);
+            currentTPTY.put("spendingPercentage", 1.00);
+            currentTPTY.put("frequencyPercentage", 1.00);
+
+            JSONArray thirdPTYarray = new JSONArray();
+            thirdPTYarray.add(currentTPTY);
+
+            summarised.put("thirdParty", thirdPTYarray);
+        }
+
+        return summarised;
+    }
+
+    private static String findTheMost(JSONArray thirdPartyArray, String item) {
+        float highest = 0;
+        String mostFreqItem = "";
+
+        for (int i = 0; i < thirdPartyArray.size(); i++) {
+            JSONObject temp = (JSONObject) thirdPartyArray.get(i);
+
+            if (Float.parseFloat(temp.get(item).toString()) > highest) {
+                highest = Float.parseFloat(temp.get(item).toString());
+                mostFreqItem = temp.get("thirdParty").toString();
+            }
+        }
+
+        return mostFreqItem;
+    }
+
+    private static JSONObject totalSpending(JSONObject clustered) {
+        Set<String> categories = clustered.keySet();
+        float totalSpent = 0;
+        float monthly = 0;
+
+        for (String category : categories) {
+            JSONArray current = (JSONArray) clustered.get(category);
+
+            for (int i = 0; i < current.size(); i++) {
+                JSONObject transaction = (JSONObject) current.get(i);
+
+                totalSpent = totalSpent + Float.parseFloat(transaction.get("amount").toString());
+            }
+        }
+
+        totalSpent = Math.abs(totalSpent);
+        monthly = totalSpent / 12;
+
+        JSONObject customer = new JSONObject();
+
+        customer.put("totalSpent", totalSpent);
+        customer.put("averageMonthlySpent", monthly);
+        customer.put("transactions", clustered);
+
+        return customer;
+    }
+
+    private static JSONObject removeEmpty(JSONObject clustered) {
+        Set<String> categories = clustered.keySet();
+        ArrayList<String> toRemove = new ArrayList<>();
+
+        for (String category : categories) {
+            JSONArray current = (JSONArray) clustered.get(category);
+
+            if (current.isEmpty() == true) {
+                toRemove.add(category);
+            }
+        }
+
+        for (String remove : toRemove) {
+            clustered.remove(remove);
+        }
+
+        return clustered;
     }
 
     private static JSONObject clusterTransactions(JSONArray transactions) {
