@@ -22,16 +22,25 @@ public class Controller {
         fileType.frame.setVisible(true);
     }
 
+    /**
+     * this method is used to summarise the transactions
+     */
     private static JSONObject summariseTransactions(JSONObject tidyJSON) {
+        // get a list of customers data
         JSONArray customers = (JSONArray) tidyJSON.get("customers");
+        System.out.println(customers);
+
         JSONObject summarisedCustomers = new JSONObject();
         JSONArray customersArray = new JSONArray();
 
         for (int i = 0; i < customers.size(); i++) {
+            //get current current customer
             JSONObject currentCustomer = (JSONObject) customers.get(i);
+            // get current customer array
             JSONArray transactions = (JSONArray) currentCustomer.get("transactions");
-
+            // cluster customer transactions into different category
             JSONObject clustered = clusterTransactions(transactions);
+            // summarise each cluster
             JSONObject customer = summariseCluster(clustered);
             customer.put("lastName", currentCustomer.get("lastName"));
             customer.put("firstName", currentCustomer.get("firstName"));
@@ -442,17 +451,18 @@ public class Controller {
      */
     private static JSONObject constructJSON(String file) {
         JSONParser jp = new JSONParser();
-        //for contain reconstructed transactions
-        JSONArray transactionList = new JSONArray();
+
         String wholeFile = "{ \"customers\":[";
         try {
-            JSONObject jsObject = (JSONObject) jp.parse(file);
-            JSONArray customers = (JSONArray) jsObject.get("customers");
+            JSONObject parsedObject = (JSONObject) jp.parse(file);
+            JSONArray customers = (JSONArray) parsedObject.get("customers");
             JSONObject tidyObject = new JSONObject();
 
             for (int i = 0; i < customers.size(); i++) {
                 JSONObject currentCustomer = (JSONObject) customers.get(i);
                 JSONArray transactions = (JSONArray) currentCustomer.get("transactions");
+                //for contain reconstructed transactions
+                JSONArray transactionList = new JSONArray();
 
                 for (int j = 0; j < transactions.size(); j++) {
                     JSONObject currentTransaction = (JSONObject) transactions.get(j);
@@ -472,6 +482,7 @@ public class Controller {
                         transactionList.add(tidyTransaction);
                     }
                 }
+
                 tidyObject.put("firstName", currentCustomer.get("firstName"));
                 tidyObject.put("lastName", currentCustomer.get("lastName"));
                 tidyObject.put("district", findDistrict(currentCustomer.get("address").toString()));
@@ -496,7 +507,6 @@ public class Controller {
             e.printStackTrace();
         }
 
-        //writeLocalFile(tidyJson);
         summariseTransactions(tidyJson);
 
         return tidyJson;
