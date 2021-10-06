@@ -28,7 +28,6 @@ public class Controller {
     private static JSONObject summariseTransactions(JSONObject tidyJSON) {
         // get a list of customers data
         JSONArray customers = (JSONArray) tidyJSON.get("customers");
-        System.out.println(customers);
 
         JSONObject summarisedCustomers = new JSONObject();
         JSONArray customersArray = new JSONArray();
@@ -83,7 +82,7 @@ public class Controller {
         int count = currentCategoryTransactions.size();
         //get unique third party
         HashSet<String> thirdParties = new HashSet<>();
-        DecimalFormat df = new DecimalFormat("#.##");
+        DecimalFormat df = new DecimalFormat("#.####");
 
         for (int i = 0; i < currentCategoryTransactions.size(); i++) {
             JSONObject transaction = (JSONObject) currentCategoryTransactions.get(i);
@@ -137,7 +136,9 @@ public class Controller {
                 monthlyCurrent = totalCurrent / 12;
 
                 float spendPercentCurr = totalCurrent / totalSpending;
+
                 float frequencyPercentageCurr = (float) currentCount / (float) count;
+
 
                 JSONObject summarisedTPTY = new JSONObject();
 
