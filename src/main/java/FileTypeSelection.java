@@ -4,6 +4,11 @@ public class FileTypeSelection extends JFrame {
     JFrame frame;
     JPanel panel;
 
+    /**
+     * initialisation of the file type selection
+     * <p>
+     * FileTypeSelection is just a window with two buttons in it, and it allows user to choose file type: single or multiple
+     */
     FileTypeSelection() {
         frame = new JFrame();
         panel = new JPanel();
@@ -30,6 +35,5 @@ public class FileTypeSelection extends JFrame {
 
         panel.add(single);
         panel.add(multiple);
-
     }
 }
