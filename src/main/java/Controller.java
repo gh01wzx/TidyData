@@ -670,7 +670,15 @@ public class Controller {
                     writeLocalJSON(oneCustomer, count);
                     count++;
                     oneCustomer = "";
-                } else {
+                }
+                else if (line.compareTo("}{") == 0)
+                {
+                    oneCustomer += "}";
+                    writeLocalJSON(oneCustomer, count);
+                    count++;
+                    oneCustomer = "{";
+                }
+                else {
                     oneCustomer += line;
                 }
                 line = reader.readLine();
