@@ -22,10 +22,18 @@ public class Controller {
         fileType.frame.setVisible(true);
     }
 
+    private static void processData(File[] files)
+    {
+        String customers = eliminateUnnecessaryData(files);
+        JSONObject tidyJson = constructJSON(customers);
+        JSONObject summarised = summariseTransactions(tidyJson);
+        writeLocalFile(summarised);
+    }
+
     /**
      * this method is used to summarise the transactions
      */
-    private static void summariseTransactions(JSONObject tidyJSON) {
+    public static JSONObject summariseTransactions(JSONObject tidyJSON) {
         // get a list of customers data
         JSONArray customers = (JSONArray) tidyJSON.get("customers");
         // the object contain multiple summarized customers, it is used to store customersArray
@@ -51,8 +59,8 @@ public class Controller {
 
         summarisedCustomers.put("customers", customersArray);
 
-        // write local file
-        writeLocalFile(summarisedCustomers);
+
+        return summarisedCustomers;
     }
 
     /**
@@ -379,7 +387,7 @@ public class Controller {
      *
      * @return wholeFile
      */
-    private static String eliminateUnnecessaryData(File[] files) {
+    public static String eliminateUnnecessaryData(File[] files) {
         //for concatenated all customers
         String customers = "{ \"customers\": [";
 
@@ -433,8 +441,6 @@ public class Controller {
         //closure
         customers += "] }";
 
-        constructJSON(customers);
-
         return customers;
     }
 
@@ -483,7 +489,7 @@ public class Controller {
      *
      * @return wholeJSON
      */
-    private static JSONObject constructJSON(String file) {
+    public static JSONObject constructJSON(String file) {
         JSONParser jp = new JSONParser();
 
         String wholeFile = "{ \"customers\":[";
@@ -540,8 +546,6 @@ public class Controller {
         } catch (ParseException e) {
             e.printStackTrace();
         }
-
-        summariseTransactions(tidyJson);
 
         return tidyJson;
     }
@@ -618,7 +622,7 @@ public class Controller {
                         }
                         fileType.frame.dispose();
                         separateFiles(singleFile);
-                        eliminateUnnecessaryData(model.files);
+                        processData(model.files);
                     }
                 });
             } else if (this.fileType.panel.getComponent(i).getName() == "multiple") {
@@ -637,7 +641,7 @@ public class Controller {
                             model.files = fileChooser.getSelectedFiles();
                         }
                         fileType.frame.dispose();
-                        eliminateUnnecessaryData(model.files);
+                        processData(model.files);
                     }
                 });
             }
